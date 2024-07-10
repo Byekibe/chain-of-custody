@@ -17,42 +17,66 @@ contract ChainOfCustody {
         uint256 timestamp;
     }
 
+    struct Custodian {
+        address addr;
+        string name;
+        bool isActive;
+    }
+
+    mapping(address => Custodian) public custodians;
+
     mapping(uint256 => Evidence) public evidences;
     uint256 public nextEvidenceId;
 
     event CustodyTransferred(uint256 indexed evidenceId, address indexed from, address indexed to, uint256 timestamp);
     event EvidenceInitialized(uint256 indexed evidenceId, string description, address initialCustodian);
     event EvidenceDescriptionUpdated(uint256 indexed evidenceId, string newDescription);
+    event CustodianCreated(address indexed custodianAddress, string name);
 
     modifier evidenceExists(uint256 _evidenceId) {
         require(_evidenceId < nextEvidenceId, "Evidence does not exist.");
         _;
     }
 
-    function initializeEvidence(string memory _description, address _initialCustodian) public returns (uint256) {
-        uint256 evidenceId = nextEvidenceId++;
-        evidences[evidenceId] = Evidence(evidenceId, _description, _initialCustodian, 0);
-        emit EvidenceInitialized(evidenceId, _description, _initialCustodian);
-        emit CustodyTransferred(evidenceId, address(0), _initialCustodian, block.timestamp);
-        return evidenceId;
+    modifier onlyActiveCustodian() {
+    require(custodians[msg.sender].isActive, "Only active custodians can perform this action.");
+    _;
     }
 
-    function transferCustody(uint256 _evidenceId, address _newCustodian) public evidenceExists(_evidenceId) {
+    function createCustodian(address _custodianAddress, string memory _name) public {
+        require(custodians[_custodianAddress].addr == address(0), "Custodian already exists.");
+        custodians[_custodianAddress] = Custodian(_custodianAddress, _name, true);
+        emit CustodianCreated(_custodianAddress, _name);
+    }
+
+function initializeEvidence(string memory _description, address _custodian) public onlyActiveCustodian returns (uint256) {
+    require(_custodian != address(0), "Custodian address cannot be zero");
+    uint256 evidenceId = nextEvidenceId++;
+    evidences[evidenceId] = Evidence(evidenceId, _description, _custodian, 0);
+    emit EvidenceInitialized(evidenceId, _description, _custodian);
+    emit CustodyTransferred(evidenceId, address(0), _custodian, block.timestamp);
+    return evidenceId;
+}
+
+    function transferCustody(uint256 _evidenceId, address _newCustodian) public evidenceExists(_evidenceId) onlyActiveCustodian {
         require(msg.sender == evidences[_evidenceId].currentCustodian, "Only the current custodian can perform this action.");
+        require(custodians[_newCustodian].isActive, "Can only transfer to active custodians.");
 
         Evidence storage evidence = evidences[_evidenceId];
 
-        // Add current custodian to custody records
         evidence.custodyRecords[evidence.custodyRecordCount++] = CustodyRecord({
             custodian: evidence.currentCustodian,
             timestamp: block.timestamp
         });
 
-        // Update current custodian
         evidence.currentCustodian = _newCustodian;
 
-        // Emit the event with the current timestamp
         emit CustodyTransferred(_evidenceId, msg.sender, _newCustodian, block.timestamp);
+    }
+
+    function deactivateCustodian(address _custodianAddress) public {
+        require(custodians[_custodianAddress].isActive, "Custodian is not active.");
+        custodians[_custodianAddress].isActive = false;
     }
 
     function updateDescription(uint256 _evidenceId, string memory _newDescription) public evidenceExists(_evidenceId) {
