@@ -41,6 +41,14 @@ export const custodianApiSlice = createApi({
         body: transferData,
       }),
     }),
+
+    createCustodian: build.mutation<Custodian, Partial<Custodian>>({
+      query: (newCustodian) => ({
+        url: '/custodians',
+        method: 'POST',
+        body: newCustodian,
+      }),
+    }),
     // More endpoints here
   }),
 });
@@ -49,4 +57,5 @@ export const {
   useGetCustodiansQuery,
   useGenerateCustodianMutation,
   useTransferCustodyMutation,
+  useCreateCustodianMutation
 } = custodianApiSlice;

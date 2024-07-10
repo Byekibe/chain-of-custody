@@ -7,6 +7,7 @@ import { useLoginUserMutation } from "@/lib/features/auths/authsApiSlice";
 import { SerializedError } from "@reduxjs/toolkit";
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useRouter } from "next/navigation";
+import NextLink from 'next/link'
 
 const LoginForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,6 +119,8 @@ const LoginForm = () => {
           </div>
         )}
       </form>
+
+      <div className="mt-4" >Dont have an account? <NextLink href="/register">Sign Up</NextLink></div>
     </div>
   );
 };
