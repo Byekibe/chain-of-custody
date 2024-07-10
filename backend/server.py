@@ -140,6 +140,60 @@ def home():
         return {"custodians": custodians}
     except Exception as e:
         return jsonify({'error': str(e)}), 500  # Internal Server Error
+
+@app.route('/api/custodians', methods=['POST'])
+def create_custodian():
+    data = request.json
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # Interact with smart contract
+        tx_hash = contract.functions.createCustodian(
+            data['address'],
+            data['name']
+        ).transact({'from': web3.eth.accounts[0]})
+        
+        # Wait for transaction to be mined
+        tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+        
+        if tx_receipt.status == 1:  # Transaction was successful
+            # Update database
+            sql = "INSERT INTO custodians (ethereum_address, name) VALUES (%s, %s)"
+            values = (data['address'], data['name'])
+            cursor.execute(sql, values)
+            conn.commit()
+            return jsonify({"message": "Custodian created successfully"}), 201
+        else:
+            return jsonify({"error": "Smart contract transaction failed"}), 400
+    
+    except Exception as e:
+        print(e)
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+    finally:
+        cursor.close()
+
+
+# Create a custodian 
+@app.route('/api/generate_custodian', methods=['POST'])
+def generate_custodian():
+    data = request.json
+    initial_custodian_name = data.get('name')
+    
+    if not initial_custodian_name:
+        return jsonify({'error': 'Initial custodian name is required'}), 400
+
+    print(f"Initial Custodian Name: {initial_custodian_name}")
+
+    # Generate Ethereum address for the initial custodian
+    generated_eth_address = generate_eth_address()
+
+    # Save the initial custodian's name and generated Ethereum address to the database
+    save_custodian_to_db(initial_custodian_name, generated_eth_address)
+
+    return jsonify({'msg': 'Initial custodian has been generated and saved to the database.'})
     
 
 @app.route("/api/register", methods=["POST"])
@@ -230,24 +284,6 @@ def login():
         return jsonify({"msg": "Internal server error"}), 500
 
 
-# Create a custodian 
-@app.route('/api/generate_custodian', methods=['POST'])
-def generate_custodian():
-    data = request.json
-    initial_custodian_name = data.get('name')
-    
-    if not initial_custodian_name:
-        return jsonify({'error': 'Initial custodian name is required'}), 400
-
-    print(f"Initial Custodian Name: {initial_custodian_name}")
-
-    # Generate Ethereum address for the initial custodian
-    generated_eth_address = generate_eth_address()
-
-    # Save the initial custodian's name and generated Ethereum address to the database
-    save_custodian_to_db(initial_custodian_name, generated_eth_address)
-
-    return jsonify({'msg': 'Initial custodian has been generated and saved to the database.'})
 
 # Initialize evidence
 @app.route('/api/initialize_evidence', methods=['POST'])
